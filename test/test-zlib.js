@@ -145,7 +145,40 @@ describe('zlib', function () {
                                memLevel: memLevel,
                                strategy: strategy }
 
-                  it(Def.name + '.' + Inf.name, function (done) {
+                  var verify = function(buf, done) {
+                    var msg = file + ' ' +
+                          chunkSize + ' ' +
+                          JSON.stringify(opts) + ' ' +
+                          Def.name + ' -> ' + Inf.name
+                    var ok = true
+                    for (var i = 0; i < Math.max(buf.length, test.length); i++) {
+                      if (buf[i] !== test[i]) {
+                        ok = false
+                        break
+                      }
+                    }
+
+                    if (ok) {
+                      done()
+                    } else {
+                      var errMsg = [
+                        'not ok ' + msg,
+                        '  ...',
+                        '  testfile: ' + file,
+                        '  type: ' + Def.name + ' -> ' + Inf.name,
+                        '  position: ' + i,
+                        '  options: ' + JSON.stringify(opts),
+                        '  expect: ' + test[i],
+                        '  actual: ' + buf[i],
+                        '  chunkSize: ' + chunkSize,
+                        '  ---'
+                      ].join('\n')
+
+                      throw new Error(errMsg)
+                    }
+                  }
+
+                  it(Def.name + '.' + Inf.name + ' (via stream)', function (done) {
                     var def = new Def(opts)
                     var inf = new Inf(opts)
                     var ss = new SlowStream(trickle)
@@ -153,42 +186,34 @@ describe('zlib', function () {
 
                     // verify that the same exact buffer comes out the other end.
                     buf.on('data', function (c) {
-                      var msg = file + ' ' +
-                            chunkSize + ' ' +
-                            JSON.stringify(opts) + ' ' +
-                            Def.name + ' -> ' + Inf.name
-                      var ok = true
-                      for (var i = 0; i < Math.max(c.length, test.length); i++) {
-                        if (c[i] !== test[i]) {
-                          ok = false
-                          break
-                        }
-                      }
-
-                      if (ok) {
-                        done()
-                      } else {
-                        var errMsg = [
-                          'not ok ' + msg,
-                          '  ...',
-                          '  testfile: ' + file,
-                          '  type: ' + Def.name + ' -> ' + Inf.name,
-                          '  position: ' + i,
-                          '  options: ' + JSON.stringify(opts),
-                          '  expect: ' + test[i],
-                          '  actual: ' + c[i],
-                          '  chunkSize: ' + chunkSize,
-                          '  ---'
-                        ].join('\n')
-
-                        throw new Error(errMsg)
-                      }
+                      verify(c, done);
                     })
 
                     // the magic happens here.
                     ss.pipe(def).pipe(inf).pipe(buf)
                     ss.end(test)
                   })
+
+                  it(Def.name + '.' + Inf.name + ' (via zlibBuffer)', function(done) {
+                    var def = new Def(opts);
+                    var inf = new Inf(opts);
+
+                    zlib.zlibBuffer(def, test, function(err, compressed) {
+                      zlib.zlibBuffer(inf, compressed, function(err, uncompressed) {
+                        verify(uncompressed, done);
+                      });
+                    });
+                  })
+
+                  it(Def.name + '.' + Inf.name + ' (via zlibBufferSync)', function(done) {
+                    var def = new Def(opts);
+                    var inf = new Inf(opts);
+
+                    var compressed = zlib.zlibBufferSync(def, test);
+                    var uncompressed = zlib.zlibBufferSync(inf, compressed);
+                    verify(uncompressed, done);
+                  })
+
                 })
               }) }) }) }) }) }) // sad stallman is sad.
   })

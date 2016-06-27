@@ -252,6 +252,9 @@ function zlibBufferSync (engine, buffer) {
   return engine._processChunk(buffer, flushFlag)
 }
 
+exports.zlibBuffer = zlibBuffer;
+exports.zlibBufferSync = zlibBufferSync;
+
 // generic zlib
 // minimal 2-byte header
 function Deflate (opts) {
